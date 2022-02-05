@@ -1,6 +1,8 @@
 package com.example.demo.controllers;
 
 import java.util.List;
+import java.util.Optional;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.example.demo.controllers.exception.UserNotFoundException;
@@ -45,12 +47,13 @@ public class OrderController {
 	
 	@GetMapping("/history/{username}")
 	public ResponseEntity<List<UserOrder>> getOrdersForUser(@PathVariable String username) {
-		User user = userRepository.findByUsername(username);
-		log.info("requestType: OrderHistory, message: Retrieve order history for username: "+user.getUsername());
-		if(user == null) {
+		Optional<User> optionalUser = Optional.ofNullable(userRepository.findByUsername(username));
+		if(!optionalUser.isPresent()) {
 			log.error("requestType: UserNotFound, message: No order was found for the username: "+username);
 			throw new UserNotFoundException("User not found");
 		}
+		User user = optionalUser.get();
+		log.info("requestType: OrderHistory, message: Retrieve order history for username: "+user.getUsername());
 		return ResponseEntity.ok(orderRepository.findByUser(user));
 	}
 }
