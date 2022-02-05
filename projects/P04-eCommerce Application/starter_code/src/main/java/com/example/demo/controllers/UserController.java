@@ -3,9 +3,12 @@ package com.example.demo.controllers;
 import java.util.Optional;
 
 
+import com.example.demo.controllers.exception.CreateUserException;
+import com.example.demo.controllers.exception.UserAlreadyExistsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,22 +49,39 @@ public class UserController {
 		User user = userRepository.findByUsername(username);
 		return user == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(user);
 	}
-	
+
+
 	@PostMapping("/create")
 	public ResponseEntity<User> createUser(@RequestBody CreateUserRequest createUserRequest) {
-		User user = new User();
-		user.setUsername(createUserRequest.getUsername());
-		log.info("The username is set to ",createUserRequest.getPassword());
-		Cart cart = new Cart();
-		cartRepository.save(cart);
-		user.setCart(cart);
-		userRepository.save(user);
-		if(createUserRequest.getPassword().length()<7 ||(!createUserRequest.getPassword().equals(createUserRequest.getConfirmPassword()))){
-			return ResponseEntity.badRequest().build();
+
+			log.info("requestType: CreateUserRequest, message: Triggering user creation request for username: " + createUserRequest.getUsername());
+			User user = new User();
+			user.setUsername(createUserRequest.getUsername());
+			Cart cart = new Cart();
+		try {
+			cartRepository.save(cart);
+			user.setCart(cart);
+			if (createUserRequest.getPassword().length() < 7 || !createUserRequest.getPassword().equals(createUserRequest.getConfirmPassword())) {
+				log.error("requestType: CreateUserRequest, message: Password does not satisfy the minimum requirements");
+				return new ResponseEntity("Password does not fulfill the minimum requirements", HttpStatus.BAD_REQUEST);
+			}
+
+		} catch (Exception e) {
+			log.error("requestType: CreateUserRequest, message: Processing failure");
+			throw new CreateUserException("Server failure");
 		}
-		user.setPassword(bCryptPasswordEncoder.encode(createUserRequest.getPassword()));
-		userRepository.save(user);
-		return ResponseEntity.ok(user);
+			user.setPassword((bCryptPasswordEncoder.encode(createUserRequest.getPassword())));
+				if (userRepository.findByUsername(createUserRequest.getUsername()) != null) {
+					log.error("requestType: CreateUserRequest, message: Username already exists");
+					throw new UserAlreadyExistsException("Username already exists");
+				} else {
+					userRepository.save(user);
+					log.info("requestType: CreateUserRequest, message: User " + createUserRequest.getUsername() + " created successfully");
+					return ResponseEntity.ok(user);
+				}
+
 	}
+
+
 	
 }
